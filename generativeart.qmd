@@ -1,0 +1,22 @@
+---
+title: "Generative Art Assignment"
+author: "Emily Cunningham"
+date: 06-04-2024
+format: html
+editor: visual
+    toc: true # includes a table of contents in rendered html format
+execute: # for all code chunks
+    warning: false # do not display warnings
+    message: false # do not display messages
+---
+
+Link to repo: <https://github.com/environmentalemily/Generative-Art-.git>
+
+Part 2a: Workshop \[structured only\]
+
+a\.
+
+```{r}
+library(ggplot2)
+library(tibble)
+```
