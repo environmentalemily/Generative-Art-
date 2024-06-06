@@ -30,6 +30,10 @@ library(ggforce)
 library(purrr)
 library(ambient)
 
+#mosaic art packages
+library(ambient)
+library(tidyr)
+
 #load in data
 mpg 
 
@@ -125,7 +129,7 @@ polar_art_02.R <- function(seed, n, palette) {
     )) +
     geom_segment(show.legend = FALSE) +
     coord_polar() +
-    scale_y_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) + #0,0 coordinates display the picture the largest 
     scale_x_continuous(expand = c(0, 0)) + 
     scale_colour_gradientn(colours = palette) + 
     scale_size(range = c(0, 50)) + 
@@ -135,7 +139,7 @@ polar_art_02.R <- function(seed, n, palette) {
 polar_art(
   seed = 5, 
   n = 1000, 
-  palette = c("#AC6A9F", "#F3A469", "#D04544")
+  palette = c("#AC6A9F", "#F3A469", "#D04544") #using sunset palatte
 ) 
 
 ```
@@ -143,8 +147,9 @@ polar_art(
 
 
 
-Using the pallette generator: 
+Using the palette generator: 
 ```{r}
+#using the palette generator
 sample_canva <- function(seed = NULL) {
   if(!is.null(seed)) set.seed(seed)
   sample(ggthemes::canva_palettes, 1)[[1]]
@@ -186,7 +191,6 @@ sample_600 <- function(n) {
 }
 
 
-
 ```
 
 ```{r}
@@ -198,9 +202,9 @@ polar_art(seed = 50,
 ```
 
 ```{r}
-sample_canva <- function(seed = NULL) {
+sample_canva <- function(seed = NULL) {.  #sample color palatte
   if(!is.null(seed)) set.seed(seed)
-  sample(ggthemes::canva_palettes, 1)[[1]]
+  sample(ggthemes::canva_palettes, 1)[[1]] 
 }
 
 sample_data <- function(seed = NULL, n = 100){
@@ -233,7 +237,7 @@ polar_styled_plot <- function(data = NULL, palette) {
       limits = c(0, 1), 
       oob = scales::oob_keep
     ) +
-    scale_x_continuous(
+    scale_x_continuous( # x-axis coordinates 
       expand = c(0, 0), 
       limits = c(0, 1), 
       oob = scales::oob_keep
@@ -252,7 +256,7 @@ polar_styled_plot <- function(data = NULL, palette) {
 
 ```{r}
 cookie <- sample_data(n = 33, seed = 3)
-snickerdoodle <- sample_600(400)
+snickerdoodle <- sample_600(400) # generate 400 colors of the 600 in the sample
 
 polar_styled_plot(data = cookie, palette = snickerdoodle) + geom_segment()
 ```
@@ -402,4 +406,182 @@ plot(pic2)
 ```
 Caption: The title for this piece is "Citrus Cells" because it reminds me of both plant cells under a microscope, and a cross section of an orange (thanks to the color palette I generated). I created this piece on 06-05-2024. I was inspired by one of the sample pieces I played around with in part d, but wanted to create something on a larger scale with fewer tiles visible. To create this piece I used what I learned in part d to create code for a tile display, and changed all of the points and scales using the geom_veronoi_tile function. I then used what I learned in part c about creating randomly generated canva color palettes, and I ran my code chunk until I got a palette that I thought resembled citrus colors. 
 
+```{r}
+sample_canva2 <- function(seed = NULL, n = 24) {
+  if(!is.null(seed)) set.seed(seed)
+  sample(ggthemes::canva_palettes, 1)[[1]] |>
+    (\(x) colorRampPalette(x)(n))()  
+}
+```
 
+
+```{r}
+
+#randomly picks rectangles based on area
+choose_rectangle <- function(blocks) {
+  sample(nrow(blocks), 1, prob = blocks$area)
+}
+#selects random break points
+choose_break <- function(lower, upper) {
+  round((upper - lower) * runif(1))
+}
+#creates a tibble with rectangles of specific coordinates
+create_rectangles <- function(left, right, bottom, top, value) {
+  tibble(
+    left = left,
+    right = right,
+    bottom = bottom,
+    top = top,
+    width = right - left,
+    height = top - bottom,
+    area = width * height,
+    value = value
+  )
+}
+#splits rectangles horizontally or vertically randomly
+split_rectangle_x <- function(rectangle, new_value) {
+  with(rectangle, {
+    split <- choose_break(left, right)
+    new_left  <- c(left, left + split)
+    new_right <- c(left + split, right)
+    new_value <- c(value, new_value)
+    create_rectangles(new_left, new_right, bottom, top, new_value)
+  })
+}
+
+split_rectangle_y <- function(rectangle, new_value) {
+  with(rectangle, {
+    split <- choose_break(bottom, top)
+    new_bottom <- c(bottom, bottom + split)
+    new_top <- c(bottom + split, top)
+    new_value <- c(value, new_value)
+    create_rectangles(left, right, new_bottom, new_top, new_value)
+  })
+}
+
+split_rectangle <- function(rectangle, value) {
+  if(runif(1) < .5) {
+    return(split_rectangle_x(rectangle, value))
+  }
+  split_rectangle_y(rectangle, value)
+}
+#split rectangles into smaller pieces
+split_block <- function(blocks, value) {
+  old <- choose_rectangle(blocks) 
+  new <- split_rectangle(blocks[old, ], value)
+  bind_rows(blocks[-old, ], new)
+}
+
+subdivision <- function(ncol = 1000, 
+                        nrow = 1000, 
+                        nsplits = 50, 
+                        seed = NULL) {
+  
+  if(!is.null(seed)) set.seed(seed)
+  blocks <- create_rectangles(
+    left = 1, 
+    right = ncol, 
+    bottom = 1, 
+    top = nrow, 
+    value = 0
+  )
+  reduce(1:nsplits, split_block, .init = blocks)
+}
+
+fill_rectangle <- function(left, right, bottom, top, width, 
+                           height, area, value, nshades = 100) {
+  
+  set.seed(value)
+  fractals <- list(billow, fbm, ridged)
+  generators <- list(gen_simplex, gen_perlin, gen_worley)
+  
+  expand_grid(
+    x = left:right, 
+    y = bottom:top, 
+  ) |>
+    mutate(
+      fill = 10 * value + fracture(
+        x = x * sample(-3:3, 1),
+        y = y * sample(-3:3, 1),
+        noise = sample(generators, 1)[[1]],
+        fractal = sample(fractals, 1)[[1]],
+        octaves = sample(10, 1),
+        frequency = sample(10, 1) / 20,
+        value = "distance2"
+      ) |>
+        normalise(to = c(1, nshades)) |> 
+        round()
+    )
+}
+
+draw_mosaic <- function(dat, palette) {
+  background <- sample(palette, 1)
+  dat |>
+    ggplot(aes(x, y, fill = fill)) +
+    geom_tile(show.legend = FALSE, colour = background, size = .3) +
+    scale_size_identity() +
+    scale_colour_gradientn(colours = palette) +
+    scale_fill_gradientn(colours = palette) +
+    scale_x_continuous(expand = expansion(add = 10)) +
+    scale_y_continuous(expand = expansion(add = 10)) + #size of mosaics
+    coord_equal() +
+    theme_void() +
+    theme(plot.background = element_rect(fill = background)) 
+}
+#creates a mosaic plot
+mosaica <- function(ncol = 70, 
+                    nrow = 60, 
+                    nsplits = 30, 
+                    seed = NULL) {
+  
+  subdivision(ncol, nrow, nsplits, seed) |>
+    pmap_dfr(fill_rectangle) |> 
+    slice_sample(prop = .995) |>
+    filter(!is.na(fill)) |>
+    draw_mosaic(palette = sample_canva2(seed))
+}
+#usuing mosaica function to create a mosaic with specified parameters
+pic_emily <- mosaica(ncol = 50, nrow = 90, nsplits = 150, seed = 1267)
+plot(pic_emily)
+
+```
+Caption: The title of this piece is "Beads" because as I created smaller and smaller tiles for the mosaic, I thought that they begin to look like beads that had been stitched into a bracelet or jewelry design. I was inspired by a pair of earrigns I bought at a street market in Mexico that depict a beaded design (which would require layign out a bead mosaic such as this before threadign them all together). This piece was created on 06-05-2024. I used elements from part c (creating canva palettes) to create the palette for this piece, and used what I learned messing around with code for the different exercises to change the shape, orientation, and scale for randomly generated decisions made by the computer (like where to split rectangles, etc.). Using the mosaica function, adjusting the ncol and nrow allows you to makes the mosaic design smaller and smaller.  
+
+
+```{r}
+
+# creates 400 numbers between 0 and 1 for the x-coordinates
+x_coords <- seq(from = 0, to = 1, length.out = 400)  
+
+# Creates 400 numbers between 0 and 1 for the y-coordinates
+y_coords <- seq(from = 0, to = 1, length.out = 400)  
+
+# Create a grid with coordinates
+canvas <- long_grid(x = x_coords, y = y_coords)  
+
+# Apply perlin noise function 
+canvas <- canvas %>%  
+  mutate(paint = gen_perlin(x, y, frequency = 10, seed = 1234))
+
+# Display the resulting canvas with the "perlin" nose applied
+canvas
+
+
+```
+```{r}
+# Create a ggplot object using coordinate points
+# usethe 'paint' values to fill
+art <- ggplot(canvas, aes(x, y, fill = paint)) + 
+  # Use the geom_raster function to create a raster plot
+  geom_raster(show.legend = FALSE)  # hide the legend 
+```
+
+```{r}
+art + 
+  theme_void() + # theme with no background or axes
+  coord_equal() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_gradientn(colours = sample_600(60)) # reuse sample 600 function to grab a bunch of colors
+```
+caption: The title of this piece is "Kaleidoscope Colors", and was created on 06-05-2024. I was inspired by the tutorial on art from code, and enjoyed playing around with the the number of colors applied to scale_fill_gradientn (which drastically changes the selection of colors used), and the level of definition in the swirly layers. I used sample_600 (which I created in part c) from the canva tutorial for colors, and the knowledge I had from creating my other art pieces about changing scale, and coordinate points (that create the outline for the piece). 
