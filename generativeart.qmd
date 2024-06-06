@@ -27,27 +27,11 @@ mpg
 ```
 
 ```{r}
-#creating initial plot for data
-mpg |>
+mpg %>% 
   ggplot(aes(displ, hwy, colour = drv)) + 
-  geom_point()
-```
-
-```{r}
-#this code creates a plot 
-
-mpg |>
-  ggplot(aes(displ, hwy, colour = drv, size = cyl)) + 
-  geom_point(show.legend = FALSE) + 
+  geom_point(show.legend = FALSE, size = 3) + 
+  geom_point(show.legend = FALSE, size = 1, colour = "#AE123A") + 
+  coord_polar() + #creates a coordinate plot 
   theme_void() + 
   scale_color_brewer()
-
-```
-
-```{r}
-9+2
-
-
-
-
 ```
