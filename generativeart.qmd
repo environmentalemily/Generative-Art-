@@ -22,6 +22,14 @@ library(ggplot2)
 library(tibble)
 library(ggthemes)
 library(scales)
+library(dplyr)
+library(ggforce)
+
+#packages for spatial noise tricks
+
+library(purrr)
+library(ambient)
+
 #load in data
 mpg 
 
@@ -131,6 +139,11 @@ polar_art(
 ) 
 
 ```
+
+
+
+
+Using the pallette generator: 
 ```{r}
 sample_canva <- function(seed = NULL) {
   if(!is.null(seed)) set.seed(seed)
@@ -148,4 +161,245 @@ show_col(sample1)
 sample2<- sample_canva() 
 show_col(sample2)
 ```
+
+Creating my own palette generator:
+```{r}
+
+sample_named_colors <- function(n){ #takes n as an input
+  sample(colours(distinct = TRUE), n)
+}
+
+```
+
+```{r}
+random_palette <- sample_named_colors(n = 12) #sets number of colors to be defined
+polar_art(seed = 14,
+          n = 1000, 
+          palette = random_palette)
+```
+
+Writing a palette- generating function that samples from a 600 distinct colors:
+```{r}
+
+sample_600 <- function(n) {
+  sample(unlist(ggthemes::canva_palettes), n)
+}
+
+
+
+```
+
+```{r}
+
+silly_sample <- sample_600(25)
+polar_art(seed = 50,
+          n = 121,
+          palette = silly_sample)
+```
+
+```{r}
+sample_canva <- function(seed = NULL) {
+  if(!is.null(seed)) set.seed(seed)
+  sample(ggthemes::canva_palettes, 1)[[1]]
+}
+
+sample_data <- function(seed = NULL, n = 100){
+  if(!is.null(seed)) set.seed(seed)
+  dat <- tibble(
+    x0 = runif(n),
+    y0 = runif(n),
+    x1 = x0 + runif(n, min = -.2, max = .2),
+    y1 = y0 + runif(n, min = -.2, max = .2),
+    shade = runif(n), 
+    size = runif(n),
+    shape = factor(sample(0:22, size = n, replace = TRUE))
+  )
+}
+
+polar_styled_plot <- function(data = NULL, palette) {
+  ggplot(
+    data = data,
+    mapping = aes(
+      x = x0,
+      y = y0,
+      xend = x1,
+      yend = y1,
+      colour = shade,
+      size = size
+    )) + 
+    coord_polar(clip = "off") +
+    scale_y_continuous(
+      expand = c(0, 0),
+      limits = c(0, 1), 
+      oob = scales::oob_keep
+    ) +
+    scale_x_continuous(
+      expand = c(0, 0), 
+      limits = c(0, 1), 
+      oob = scales::oob_keep
+    ) + 
+    scale_colour_gradientn(colours = palette) + 
+    scale_size(range = c(0, 10)) + 
+    theme_void() + 
+    guides(
+      colour = guide_none(),
+      size = guide_none(),
+      fill = guide_none(),
+      shape = guide_none()
+    )
+}
+```
+
+```{r}
+cookie <- sample_data(n = 33, seed = 3)
+snickerdoodle <- sample_600(400)
+
+polar_styled_plot(data = cookie, palette = snickerdoodle) + geom_segment()
+```
+
+
+
+
+c. art of choice: spatial noise
+```{r}
+
+x_coords <- seq(from = 0, to = 1, length.out = 1000)
+y_coords <- seq(from = 0, to = 1, length.out = 1000)
+```
+```{r}
+canvas <- long_grid(x = x_coords, y = y_coords) 
+canvas
+```
+```{r}
+gen_worley(x = 1:5, y = 1, frequency = .001, seed = 2)
+gen_worley(x = 1:5, y = 1, frequency = .5, seed = 2)
+```
+
+```{r}
+canvas <- canvas |> 
+  mutate(paint = gen_worley(x, y, frequency = 10, seed = 1234)) #seed changes spatial pattern
+canvas
+```
+
+```{r}
+art <- ggplot(canvas, aes(x, y, fill = paint)) + 
+  geom_raster(show.legend = FALSE) 
+```
+
+```{r}
+art
+art + 
+  theme_void() +
+  coord_equal()
+art + 
+  theme_void() +
+  coord_equal() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_gradientn(colours = sample_600(n = 25)) #use canvas palette created earlier
+```
+
+
+
+
+
+
+
+d. art of choice: tiles and tessellations: Voronoi
+```{r}
+
+set.seed(90)
+
+dat <- tibble(
+  x = runif(30),
+  y = runif(30),
+  val = runif(30)
+)
+
+bg_dat <- tibble(
+  x = runif(100, min = -.5, max = 1.5),
+  y = runif(100, min = -.5, max = 1.5)
+)
+
+pic <- ggplot(dat, aes(x, y, fill = val)) +
+  coord_equal(xlim = c(-.5, 1.5), ylim = c(-.5, 1.5)) + #adjust range of the tiles
+  guides(fill = guide_none()) +
+  theme_void() + 
+  theme(panel.background = element_rect(
+    fill = "#BEA037", colour = "#E2D3CE"
+  ))
+
+pic2 <- pic + 
+  geom_voronoi_tile(
+    data = bg_dat,
+    fill = "#D5A7C4", 
+    radius = .02, #adjusts thickness of background walls
+    expand = -.0025
+  ) +
+  geom_voronoi_tile(
+    size = 3,
+    fill = "#3C8D53", #tile color color, use colour = to create a border
+    max.radius = .2, #adjusts the size of the rounded tiles
+    radius = .02, #rounds the points
+    expand = -.006 #creates little spaces between tiles
+  )
+
+plot(pic2)
+
+
+```
+
+
+e. putting it all together
+
+creating a canva color palette for art piece:
+```{r}
+sample4<- sample_canva() 
+show_col(sample4)
+```
+
+
+```{r}
+set.seed(50)
+
+dat <- tibble(
+  x = runif(30),
+  y = runif(30),
+  val = runif(30)
+)
+
+bg_dat <- tibble(
+  x = runif(1000, min = -1.025, max = 1.025),
+  y = runif(1000, min = -.5, max = 1.5)
+)
+
+pic <- ggplot(dat, aes(x, y, fill = val)) +
+  coord_equal(xlim = c(-.2, 0.5), ylim = c(-.2, 0.5)) + #adjust range of the tiles
+  guides(fill = guide_none()) +
+  theme_void() + 
+  theme(panel.background = element_rect(
+    fill = "#4485ce", colour = "#E2D3CE"
+  ))
+
+pic2 <- pic + 
+  geom_voronoi_tile(
+    data = bg_dat,
+    fill = "#f9cf00", 
+    radius = .01, #adjusts thickness of background walls
+    expand = -.0004 #adjusts scale of texture
+  ) +
+  #creates green tiles
+  geom_voronoi_tile(
+    fill = "#f19f4d", #tile color color, use colour = to create a border
+    max.radius = .2, #adjusts the size of the rounded tiles
+    radius = .02,
+    expand = -.005
+  )
+
+plot(pic2)
+
+
+```
+Caption: The title for this piece is "Citrus Cells" because it reminds me of both plant cells under a microscope, and a cross section of an orange (thanks to the color palette I generated). I created this piece on 06-05-2024. I was inspired by one of the sample pieces I played around with in part d, but wanted to create something on a larger scale with fewer tiles visible. To create this piece I used what I learned in part d to create code for a tile display, and changed all of the points and scales using the geom_veronoi_tile function. I then used what I learned in part c about creating randomly generated canva color palettes, and I ran my code chunk until I got a palette that I thought resembled citrus colors. 
+
 
