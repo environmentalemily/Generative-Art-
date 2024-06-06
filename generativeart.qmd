@@ -12,11 +12,42 @@ execute: # for all code chunks
 
 Link to repo: <https://github.com/environmentalemily/Generative-Art-.git>
 
-Part 2a: Workshop \[structured only\]
+Part 2a: Workshop \[structured\]
 
 a\.
 
 ```{r}
+#load in packages
 library(ggplot2)
 library(tibble)
+
+#load in data
+mpg 
+
+```
+
+```{r}
+#creating initial plot for data
+mpg |>
+  ggplot(aes(displ, hwy, colour = drv)) + 
+  geom_point()
+```
+
+```{r}
+#this code creates a plot 
+
+mpg |>
+  ggplot(aes(displ, hwy, colour = drv, size = cyl)) + 
+  geom_point(show.legend = FALSE) + 
+  theme_void() + 
+  scale_color_brewer()
+
+```
+
+```{r}
+9+2
+
+
+
+
 ```
